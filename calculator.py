@@ -1,6 +1,7 @@
 from PyQt5 import uic, Qt, QtCore
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow
 from PyQt5.QtCore import pyqtSignal, QObject
+from enum import Enum
 import sys
 
 
@@ -8,253 +9,290 @@ class Calculator(QMainWindow):
     def __init__(self):
         super().__init__()
         self.win = uic.loadUi("calculator.ui", self)
-        self.setup_buttons()
-        self.input_text = ""
-        self.numbers = ""
-        self.calcModel = calcModel()
-        self.setup_display()
+        self.calc_model = CalcModel()
+        self.setup_ui()
 
     def setup_buttons(self):
         self.win.btn0.clicked.connect(
-            lambda: self.calcModel.button_pressed("0"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_0))
         self.win.btn1.clicked.connect(
-            lambda: self.calcModel.button_pressed("1"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_1))
         self.win.btn2.clicked.connect(
-            lambda: self.calcModel.button_pressed("2"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_2))
         self.win.btn3.clicked.connect(
-            lambda: self.calcModel.button_pressed("3"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_3))
         self.win.btn4.clicked.connect(
-            lambda: self.calcModel.button_pressed("4"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_4))
         self.win.btn5.clicked.connect(
-            lambda: self.calcModel.button_pressed("5"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_5))
         self.win.btn6.clicked.connect(
-            lambda: self.calcModel.button_pressed("6"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_6))
         self.win.btn7.clicked.connect(
-            lambda: self.calcModel.button_pressed("7"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_7))
         self.win.btn8.clicked.connect(
-            lambda: self.calcModel.button_pressed("8"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_8))
         self.win.btn9.clicked.connect(
-            lambda: self.calcModel.button_pressed("9"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_9))
 
         self.win.btnPoint.clicked.connect(
-            lambda: self.calcModel.button_pressed("."))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Period))
         self.win.btnPlus.clicked.connect(
-            lambda: self.calcModel.button_pressed("+"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Plus))
         self.win.btnMinus.clicked.connect(
-            lambda: self.calcModel.button_pressed("-"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Minus))
         self.win.btnTimes.clicked.connect(
-            lambda: self.calcModel.button_pressed("*"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Asterisk))
         self.win.btnDivide.clicked.connect(
-            lambda: self.calcModel.button_pressed("/"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Slash))
 
         self.win.btnResult.clicked.connect(
-            lambda: self.calcModel.button_pressed("="))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Return))
         self.win.btnDelete.clicked.connect(
-            lambda: self.calcModel.button_pressed("del"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Backspace))
         self.win.btnClear.clicked.connect(
-            lambda: self.calcModel.button_pressed("clear"))
+            lambda: self.calc_model.button_pressed(QtCore.Qt.Key_Delete))
 
     def keyPressEvent(self, event):
-        if self.calcModel.accepts(event.key()):
-            self.calcModel.key_pressed(event)
+        if self.calc_model.can_handle_key(event.key()):
+            self.calc_model.key_pressed(event.key())
             event.accept()
-            return
-
-        if event.key() == QtCore.Qt.Key_Return:
-            self.win.btnResult.click()
-
-        elif event.key() == QtCore.Qt.Key_Backspace:
-            self.win.btnDelete.click()
-
-        elif event.key() == QtCore.Qt.Key_Delete:
-            self.win.btnClear.click()
 
         else:
             event.ignore()
 
-    def setup_display(self):
-        self.calcModel.data_changed.connect(
-            lambda: self.win.lcdNumber.display(self.calcModel.display()))
+    def setup_ui(self):
+        self.win.lblOperator.setText("")
+        self.setup_buttons()
+        self.calc_model.model_changed.connect(
+            lambda: self.win.lcdNumber.display(self.calc_model.get_display_text()))
+        self.calc_model.model_changed.connect(
+            lambda: self.win.lblOperator.setText(self.calc_model.get_operator()))
 
 
-class calcModel(QObject):
-    data_changed = pyqtSignal()
+class CalcModel(QObject):
+    class LoggingEntity(Enum):
+        BUTTON = 0
+        KEY = 1
+        RESULT = 2
+
+    model_changed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.text = ""
-        self.formular = ""
+        self.formula = ""
         self.finished = False
 
-    def is_operator(self, key_code):
-        return (key_code == QtCore.Qt.Key_Plus) or \
-            (key_code == QtCore.Qt.Key_Minus) or \
-            (key_code == QtCore.Qt.Key_Asterisk) or \
-            (key_code == QtCore.Qt.Key_Slash) or \
-            (key_code == QtCore.Qt.Key_Delete) or \
-            (key_code == QtCore.Qt.Key_Backspace) or \
-            (key_code == QtCore.Qt.Key_Return)
+    @staticmethod
+    def is_operator(key_code):
+        return key_code == QtCore.Qt.Key_Plus \
+            or key_code == QtCore.Qt.Key_Minus \
+            or key_code == QtCore.Qt.Key_Asterisk \
+            or key_code == QtCore.Qt.Key_Slash \
+            or key_code == QtCore.Qt.Key_Delete \
+            or key_code == QtCore.Qt.Key_Backspace \
+            or key_code == QtCore.Qt.Key_Return \
+            or key_code == QtCore.Qt.Key_Enter
 
-    def is_digit(self, key_code):
-        return key_code == QtCore.Qt.Key_0 or \
-            key_code == QtCore.Qt.Key_1 or \
-            key_code == QtCore.Qt.Key_2 or \
-            key_code == QtCore.Qt.Key_3 or \
-            key_code == QtCore.Qt.Key_4 or \
-            key_code == QtCore.Qt.Key_5 or \
-            key_code == QtCore.Qt.Key_6 or \
-            key_code == QtCore.Qt.Key_7 or \
-            key_code == QtCore.Qt.Key_8 or \
-            key_code == QtCore.Qt.Key_9
+    @staticmethod
+    def is_digit(key_code):
+        return key_code == QtCore.Qt.Key_0 \
+            or key_code == QtCore.Qt.Key_1 \
+            or key_code == QtCore.Qt.Key_2 \
+            or key_code == QtCore.Qt.Key_3 \
+            or key_code == QtCore.Qt.Key_4 \
+            or key_code == QtCore.Qt.Key_5 \
+            or key_code == QtCore.Qt.Key_6 \
+            or key_code == QtCore.Qt.Key_7 \
+            or key_code == QtCore.Qt.Key_8 \
+            or key_code == QtCore.Qt.Key_9
 
-    def is_period(self, key_code):
-        return key_code == QtCore.Qt.Key_Period
+    def is_period(key_code):
+        return key_code == QtCore.Qt.Key_Period or key_code == QtCore.Qt.Key_Comma
 
-    def to_key_code(self, text):
-        if (text == "+"):
+    @staticmethod
+    def key_code_to_text(key_code):
+        if key_code == QtCore.Qt.Key_0:
+            return "0"
+
+        if key_code == QtCore.Qt.Key_1:
+            return "1"
+
+        if key_code == QtCore.Qt.Key_2:
+            return "2"
+
+        if key_code == QtCore.Qt.Key_3:
+            return "3"
+
+        if key_code == QtCore.Qt.Key_4:
+            return "4"
+
+        if key_code == QtCore.Qt.Key_5:
+            return "5"
+
+        if key_code == QtCore.Qt.Key_6:
+            return "6"
+
+        if key_code == QtCore.Qt.Key_7:
+            return "7"
+
+        if key_code == QtCore.Qt.Key_8:
+            return "8"
+
+        if key_code == QtCore.Qt.Key_9:
+            return "9"
+
+        if key_code == QtCore.Qt.Key_Plus:
+            return "+"
+
+        if key_code == QtCore.Qt.Key_Minus:
+            return "-"
+
+        if key_code == QtCore.Qt.Key_Asterisk:
+            return "*"
+
+        if key_code == QtCore.Qt.Key_Slash:
+            return "/"
+
+        if key_code == QtCore.Qt.Key_Backspace:
+            return "delete"
+
+        if key_code == QtCore.Qt.Key_Delete:
+            return "clear"
+
+        if key_code == QtCore.Qt.Key_Return or key_code == QtCore.Qt.Key_Enter:
+            return "="
+
+        if CalcModel.is_period(key_code):
+            return "."
+
+    @staticmethod
+    def text_to_key_code(text):
+        if text == "+":
             return QtCore.Qt.Key_Plus
 
-        if (text == "-"):
+        if text == "-":
             return QtCore.Qt.Key_Minus
 
-        if (text == "/"):
-            return QtCore.Qt.Key_Slash
-
-        if (text == "*"):
+        if text == "*":
             return QtCore.Qt.Key_Asterisk
 
-        if (text == "."):
-            return QtCore.Qt.Key_Period
+        if text == "/":
+            return QtCore.Qt.Key_Slash
 
-        if (text == "clear"):
-            return QtCore.Qt.Key_Delete
-
-        if (text == "del"):
-            return QtCore.Qt.Key_Backspace
-
-        if (text == "="):
-            return QtCore.Qt.Key_Return
-
-        return QtCore.Qt.Key_unknown
 
     def log_input(type):
         def log_decorator(function):
-            def log_function(self, content):
-                # sys.stdout.write("Following was entered: " + content + "\n")
-                if type == 0:
+            def log_function(self, to_be_logged):
+                if type == CalcModel.LoggingEntity.BUTTON:
                     sys.stdout.write(
-                        "Following button was clicked: " + content + "\n")
-                if type == 1:
+                        "Following button was clicked: " + CalcModel.key_code_to_text(to_be_logged) + "\n")
+                
+                elif type == CalcModel.LoggingEntity.KEY:
                     sys.stdout.write(
-                        "Following key was pressed: " + content.text() + "\n")
+                        "Following key was pressed: " + CalcModel.key_code_to_text(to_be_logged) + "\n")
 
-                function(self, content)
+                elif type == CalcModel.LoggingEntity.RESULT:
+                    sys.stdout.write(
+                        "Following result was evaluated: " + str(to_be_logged) + "\n")
+
+                function(self, to_be_logged)
 
             return log_function
         return log_decorator
 
-    @log_input(1)
-    def key_pressed(self, event):
+    @log_input(LoggingEntity.KEY)
+    def key_pressed(self, key_code):
         if self.finished:
             self.clear()
 
-        if not self.finished:
-            if event.key() == int(QtCore.Qt.Key_Return):
-                self.calculate()
+        self.handle_input(key_code)
 
-            elif event.key() == int(QtCore.Qt.Key_Backspace):
-                self.delete()
-
-            elif event.key() == int(QtCore.Qt.Key_Delete):
-                self.clear()
-
-            else:
-                self.handle_input(event.text())
-
-    @log_input(0)
-    def button_pressed(self, text):
+    @log_input(LoggingEntity.BUTTON)
+    def button_pressed(self, key_code):
         if self.finished:
             self.clear()
 
-        if not self.finished:
-            self.handle_input(text)
+        self.handle_input(key_code)
+
+    @log_input(LoggingEntity.RESULT)
+    def on_result_evaluated(self, result):
+        self.text = result
+        self.finished = True
+        self.model_changed.emit()
 
     def delete(self):
         if self.text:
             self.text = self.text[:-1]
-            self.formular = self.formular[:-1]
-            self.data_changed.emit()
+            self.model_changed.emit()
 
     def clear(self):
         self.finished = False
-        self.formular = ""
+        self.formula = ""
         self.text = ""
-        self.data_changed.emit()
+        self.model_changed.emit()
 
     def calculate(self):
         try:
-            self.text = eval(self.formular)
+            if self.formula:
+                self.on_result_evaluated(eval(self.formula))
         except SyntaxError:
-            self.text = "Err"
+            self.text = "ERR"
 
-        self.finished = True
-        self.data_changed.emit()
-        # sys.stdout.write("The result is: " + self.text + "\n")pppppppp
-
-    def accepts(self, key_code):
-        if self.is_digit(key_code):
-            return True
-
-        elif self.is_operator(key_code):
-            return True
-
-        elif self.is_period(key_code):
+    def can_handle_key(self, key_code):
+        if CalcModel.is_digit(key_code) \
+            or CalcModel.is_operator(key_code) \
+            or CalcModel.is_period(key_code):
             return True
 
         return False
 
-    def get_formular(self):
-        return self.formular
-
-    def display(self):
-        if self.text == "":
+    def get_display_text(self):
+        if not self.text:
             return "0"
 
         return self.text
 
-    # @log_input()
-    def handle_input(self, input):
-        if not self.is_key_allowed(input):
+    def get_operator(self):
+        if not self.formula:
+            return ""
+
+        if self.finished:
+            return "="
+
+        return self.formula[-1]
+
+    def handle_input(self, key_code):
+        if not self.is_key_allowed(key_code):
             return
 
-        if self.is_operator(self.to_key_code(input)):
-            if input == "del":
-                self.delete()
+        key_text = CalcModel.key_code_to_text(key_code)
 
-            elif input == "clear":
+        if CalcModel.is_operator(key_code):
+            if key_code == QtCore.Qt.Key_Delete:
                 self.clear()
 
-            elif input == "=":
+            elif key_code == QtCore.Qt.Key_Backspace:
+                self.delete()
+
+            elif key_code == QtCore.Qt.Key_Return or key_code == QtCore.Qt.Key_Enter:
+                self.formula += self.text
                 self.calculate()
 
-            else:
+            elif self.formula and not self.text:
+                self.formula = self.formula[:-1] + key_text
+
+            elif self.text:
+                self.formula += self.text + key_text
                 self.text = ""
 
         else:
-            self.text += input
+            self.text += key_text
+            
+        self.model_changed.emit()
 
-        self.formular += input
-        self.data_changed.emit()
-
-    def is_key_allowed(self, key):
-        key_code = self.to_key_code(key)
-
-        if (self.is_operator(key_code)) \
-            and (self.formular.endswith(key)
-                 or (self.text == "")):
-            return False
-
-        if (self.is_period(key_code)) and ("." in self.text):
+    def is_key_allowed(self, key_code):
+        if CalcModel.is_period(key_code) and ("." in self.text):
             return False
 
         return True

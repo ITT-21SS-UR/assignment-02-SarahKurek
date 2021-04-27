@@ -61,8 +61,11 @@ class Calculator(QMainWindow):
             event.ignore()
 
     def setup_ui(self):
+        # label to display the current operator (initialized empty).
         self.win.lblOperator.setText("")
         self.setup_buttons()
+
+        # lcd panel with 15 digits to display the current number.
         self.calc_model.model_changed.connect(
             lambda: self.win.lcdNumber.display(self.calc_model.get_display_text()))
         self.calc_model.model_changed.connect(
@@ -70,6 +73,7 @@ class Calculator(QMainWindow):
 
 
 class CalcModel(QObject):
+    # input source (button, key, result) for proper logging
     class LoggingEntity(Enum):
         BUTTON = 0
         KEY = 1
@@ -79,9 +83,9 @@ class CalcModel(QObject):
 
     def __init__(self):
         super().__init__()
-        self.text = ""
-        self.formula = ""
-        self.finished = False
+        self.text = ""  # current digits
+        self.formula = ""  # current formula with operators
+        self.finished = False  # indicates a finished calculation
 
     @staticmethod
     def is_operator(key_code):
@@ -180,14 +184,13 @@ class CalcModel(QObject):
         if text == "/":
             return QtCore.Qt.Key_Slash
 
-
     def log_input(type):
         def log_decorator(function):
             def log_function(self, to_be_logged):
                 if type == CalcModel.LoggingEntity.BUTTON:
                     sys.stdout.write(
                         "Following button was clicked: " + CalcModel.key_code_to_text(to_be_logged) + "\n")
-                
+
                 elif type == CalcModel.LoggingEntity.KEY:
                     sys.stdout.write(
                         "Following key was pressed: " + CalcModel.key_code_to_text(to_be_logged) + "\n")
@@ -242,7 +245,7 @@ class CalcModel(QObject):
     def can_handle_key(self, key_code):
         if CalcModel.is_digit(key_code) \
             or CalcModel.is_operator(key_code) \
-            or CalcModel.is_period(key_code):
+                or CalcModel.is_period(key_code):
             return True
 
         return False
@@ -263,9 +266,11 @@ class CalcModel(QObject):
         return self.formula[-1]
 
     def handle_input(self, key_code):
+        # if key is not alllowed the input is ignored
         if not self.is_key_allowed(key_code):
             return
 
+        # the key code is converted to its text representation
         key_text = CalcModel.key_code_to_text(key_code)
 
         if CalcModel.is_operator(key_code):
@@ -275,10 +280,12 @@ class CalcModel(QObject):
             elif key_code == QtCore.Qt.Key_Backspace:
                 self.delete()
 
+            # before calculation the text is appended to the formula
             elif key_code == QtCore.Qt.Key_Return or key_code == QtCore.Qt.Key_Enter:
                 self.formula += self.text
                 self.calculate()
 
+            # this effectively changes the current operator
             elif self.formula and not self.text:
                 self.formula = self.formula[:-1] + key_text
 
@@ -288,7 +295,7 @@ class CalcModel(QObject):
 
         else:
             self.text += key_text
-            
+
         self.model_changed.emit()
 
     def is_key_allowed(self, key_code):
